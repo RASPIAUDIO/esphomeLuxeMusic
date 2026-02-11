@@ -1,12 +1,12 @@
 {
-  "name": "raspiaudio.voice-assistant",
-  "version": "2025.3.1",
+  "name": "raspiaudio.music-assistant",
+  "version": "2025.1.0",
   "builds": [
     {
       "chipFamily": "ESP32",
       "ota": {
          "md5": "147c31aae0951c2710751c5410970b68",  
-         "path": "https://raw.githubusercontent.com/RASPIAUDIO/esphomeLuxe/main/update_firmware.bin",
+         "path": "https://raw.githubusercontent.com/RASPIAUDIO/esphomeLuxeMusic/main/update_firmware.bin",
          "offset": 0,
          "summary": "Latest firmware"
          }

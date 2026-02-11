@@ -10,7 +10,10 @@ esphome:
     priority: -100
     then:
       - script.execute: led_red
-
+  project:
+    name: raspiaudio.music-assistant
+    version: "2026.1.0"  
+    
 esp32:
   variant: esp32
   framework:
@@ -28,18 +31,28 @@ api:
             id(play_sound)->execute(true, std::string("ready_sound"));
           }
         }
-ota:
-- platform: esphome
 
 wifi:
-  ssid: "wifilr"
-  password: "casanice"
+#  ssid: 
+#  password: 
   ap:
-    password: "RZ7D3EzJdPM6"
+    ssid: "luxemusic"
+    password: "12345678"
 
 psram:
   mode: quad
   speed: 80MHz
+  
+ota:                 
+  - platform: esphome
+    id: ota_esphome
+  - platform: http_request
+    id: ota_http_request  
+update:
+  - platform: http_request
+    id: update_http_request
+    name: Firmware
+    source: https://raw.githubusercontent.com/RASPIAUDIO/esphomeLuxeMusic/main/manifest_update.json   
 
 http_request:
   
