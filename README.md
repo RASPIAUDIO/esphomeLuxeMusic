@@ -1,6 +1,6 @@
 # esphomeLuxeMusic
 *esphomeLuxeMusic* is a new player based on the **SendSpin** protocol, enabling *synchronized multiroom playback*.
-**SendSpin** is specific to Music Assistant.
+(**SendSpin** is specific to Music Assistant).
 
 This is a first attempt and is intended to evolve (we welcome your feedback on the *raspiaudio.com* forum).
 
