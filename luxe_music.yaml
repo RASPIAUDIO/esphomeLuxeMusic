@@ -11,13 +11,16 @@ esphome:
     then:
       - script.execute: led_red
   project:
-    name: raspiaudio.music-assistant
-    version: "2026.1.0"  
+    name: raspiaudio.luxe-music-assistant
+    version: "2026.1.2"  
     
 esp32:
   variant: esp32
   framework:
     type: esp-idf
+    advanced:
+      include_builtin_idf_components:
+        - esp_http_client
 
 logger:
   level: debug
@@ -97,13 +100,7 @@ external_components:
       url: https://github.com/esphome/esphome
       ref: 928204066ce0082404573ea1c6a0b58aeebbd7c6
     refresh: 0s
-    components: [file, http_request, media_source, speaker_source]
-  - source:
-      type: git
-      url: https://github.com/kahrendt/esphome
-      ref: wifi-power-save-wake-loop
-    refresh: 0s
-    components: [wifi]
+    components: [file, media_source, speaker_source]
   - source: github://pr#3552
     components: [es8388]
     refresh: 0s
@@ -157,9 +154,6 @@ sendspin:
 media_source:
   - platform: sendspin
     id: sendspin_source
-  - platform: http_request
-    id: http_source
-    buffer_size: 500000
   - platform: file
     id: file_source
     files:
@@ -188,7 +182,6 @@ media_player:
     volume_min: 0.5
     volume_max: 0.9
     sources:
-      - http_source
       - sendspin_source
       - file_source
     on_state:
