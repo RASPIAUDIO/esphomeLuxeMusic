@@ -11,8 +11,8 @@ esphome:
     then:
       - script.execute: led_red
   project:
-    name: raspiaudio.luxe-music-assistant
-    version: "2026.1.2"  
+    name: raspiaudio.music-assistant
+    version: "2026.1.3"  
     
 esp32:
   variant: esp32
@@ -23,7 +23,7 @@ esp32:
         - esp_http_client
 
 logger:
-  level: debug
+  level: warn
 
 api:
   on_client_connected:
@@ -126,7 +126,7 @@ speaker:
     i2s_dout_pin: GPIO26
     dac_type: external
     channel: stereo
-    buffer_duration: 300ms
+    buffer_duration: 500ms
 
   - platform: mixer
     id: mixing_speaker
@@ -154,6 +154,7 @@ sendspin:
 media_source:
   - platform: sendspin
     id: sendspin_source
+    buffer_size: 2000000
   - platform: file
     id: file_source
     files:
