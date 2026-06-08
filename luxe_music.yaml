@@ -6,13 +6,16 @@ esphome:
   friendly_name: Raspiaudio Luxe Music
   min_version: 2026.1.0
   name_add_mac_suffix: true
+  platformio_options:
+    build_flags:
+      - -I../../../compat
   on_boot:
     priority: -100
     then:
       - script.execute: led_red
   project:
     name: raspiaudio.music-assistant
-    version: "2026.1.3"  
+    version: "2026.1.4"  
     
 esp32:
   variant: esp32
@@ -58,6 +61,12 @@ update:
     source: https://raw.githubusercontent.com/RASPIAUDIO/esphomeLuxeMusic/main/manifest_update.json   
 
 http_request:
+
+audio:
+  codecs:
+    flac:
+    mp3:
+    wav:
   
 captive_portal:
 
@@ -65,40 +74,16 @@ improv_serial:
 
 external_components:
   - source:
-      # https://github.com/esphome/esphome/pull/12253
-      type: git
-      url: https://github.com/esphome/esphome
-      ref: 7f34908569650e5a8b8c83e6bf89fea561218880
-    components: [mixer]
-  - source:
-      # https://github.com/esphome/esphome/pull/12254
-      type: git
-      url: https://github.com/esphome/esphome
-      ref: 6006b896a691ad38d8045ac67564c168973d1a1d
-    components: [resampler]
-  - source:
-      # https://github.com/esphome/esphome/pull/12256
-      type: git
-      url: https://github.com/esphome/esphome
-      ref: 9148832ea4e54907bad71a24d4ced1ce6c862433
-    components: [audio]
-  - source:
-      # https://github.com/esphome/esphome/pull/12258
-      type: git
-      url: https://github.com/esphome/esphome
-      ref: bff22983a390352360796f8e1363127e0cd1f898
-    components: [media_player]
-  - source:
       # https://github.com/esphome/esphome/pull/12284
       type: git
       url: https://github.com/esphome/esphome
-      ref: a6c0a861a014e64c67d46115eba8e5370777b80a
+      ref: fd9af678da24102f414b78ac90e66a3b7cd98460
     components: [mdns, sendspin]
   - source:
       # https://github.com/esphome/esphome/pull/12429
       type: git
       url: https://github.com/esphome/esphome
-      ref: 928204066ce0082404573ea1c6a0b58aeebbd7c6
+      ref: 9055f4f868c2f889d58c576c7c5e4177477180bd
     refresh: 0s
     components: [file, media_source, speaker_source]
   - source: github://pr#3552
