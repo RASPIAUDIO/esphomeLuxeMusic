@@ -15,7 +15,7 @@ esphome:
       - script.execute: led_red
   project:
     name: raspiaudio.music-assistant
-    version: "2026.1.4"  
+    version: "2026.1.5"  
     
 esp32:
   variant: esp32
@@ -24,6 +24,7 @@ esp32:
     advanced:
       include_builtin_idf_components:
         - esp_http_client
+      sram1_as_iram: true
 
 logger:
   level: warn
@@ -41,6 +42,7 @@ api:
 wifi:
 #  ssid: 
 #  password: 
+  power_save_mode: none
   ap:
     ssid: "luxemusic"
     password: "12345678"
@@ -86,10 +88,9 @@ external_components:
       ref: 9055f4f868c2f889d58c576c7c5e4177477180bd
     refresh: 0s
     components: [file, media_source, speaker_source]
-  - source: github://pr#3552
+  - source: github://RASPIAUDIO/esphomeLuxe@main
     components: [es8388]
     refresh: 0s
-
 
 i2c:
   sda: GPIO18
@@ -103,7 +104,16 @@ i2s_audio:
   - id: i2s_audio_bus
     i2s_lrclk_pin: GPIO25
     i2s_bclk_pin:  GPIO5
-
+#####################
+# Internal Components
+output:
+  - platform: gpio
+    id: dac_mute
+    pin:
+      number: GPIO21
+      inverted: true
+      mode:
+        output: true
 speaker:
   - platform: i2s_audio
     id: box_speaker
@@ -111,7 +121,7 @@ speaker:
     i2s_dout_pin: GPIO26
     dac_type: external
     channel: stereo
-    buffer_duration: 500ms
+    buffer_duration: 1000ms
 
   - platform: mixer
     id: mixing_speaker
@@ -119,17 +129,21 @@ speaker:
     num_channels: 2
     source_speakers:
       - id: announcement_mixer_input
+        buffer_duration: 250ms
       - id: media_mixer_input
+        buffer_duration: 250ms
 
   - platform: resampler
     id: media_resampling_input
     output_speaker: media_mixer_input
     sample_rate: 48000
+    buffer_duration: 250ms
 
   - platform: resampler
     id: announcement_resampling_input
     output_speaker: announcement_mixer_input    
     sample_rate: 48000
+    buffer_duration: 250ms
 
 sendspin:
   id: sendspin_hub
