@@ -15,7 +15,7 @@ esphome:
       - script.execute: led_red
   project:
     name: raspiaudio.music-assistant
-    version: "2026.1.5"  
+    version: "2026.1.6"  
     
 esp32:
   variant: esp32
@@ -76,11 +76,15 @@ improv_serial:
 
 external_components:
   - source:
+      type: local
+      path: local_components
+    components: [sendspin]
+  - source:
       # https://github.com/esphome/esphome/pull/12284
       type: git
       url: https://github.com/esphome/esphome
       ref: fd9af678da24102f414b78ac90e66a3b7cd98460
-    components: [mdns, sendspin]
+    components: [mdns]
   - source:
       # https://github.com/esphome/esphome/pull/12429
       type: git
@@ -173,14 +177,16 @@ media_player:
       format: FLAC
       num_channels: 1
       sample_rate: 48000
+      playlist_delay: 500ms
     media_pipeline:
       format: FLAC
       num_channels: 2      
       sample_rate: 48000
+      playlist_delay: 1500ms
 
     volume_increment: 0.05
-    volume_min: 0.5
-    volume_max: 0.9
+    volume_min: 0.05
+    volume_max: 0.95
     sources:
       - sendspin_source
       - file_source
