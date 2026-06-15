@@ -15,7 +15,7 @@ esphome:
       - script.execute: led_red
   project:
     name: raspiaudio.music-assistant
-    version: "2026.1.6"  
+    version: "2026.1.7"  
     
 esp32:
   variant: esp32

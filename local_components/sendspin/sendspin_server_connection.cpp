@@ -32,7 +32,8 @@ static const char *const TAG = "sendspin.server_connection";
  * and payload data for async send operations.
  */
 struct AsyncRespArg {
-  void *context;
+  httpd_handle_t server;
+  int sockfd{-1};
   uint8_t *payload;
   size_t len;
   bool has_callback{false};
@@ -68,9 +69,13 @@ void SendspinServerConnection::disconnect(SendspinGoodbyeReason reason, std::fun
 
   // Send goodbye message, then trigger close, then invoke user callback
   // Capture on_complete by value to keep it alive until async callback fires
-  this->send_goodbye_reason(reason, [this, on_complete](bool success, int64_t) {
+  httpd_handle_t server = this->server_;
+  int sockfd = this->sockfd_;
+  this->send_goodbye_reason(reason, [server, sockfd, on_complete](bool success, int64_t) {
     // Trigger close regardless of send success
-    this->trigger_close();
+    if (sockfd >= 0) {
+      httpd_sess_trigger_close(server, sockfd);
+    }
 
     // Invoke user-provided completion callback if provided
     // Note: This is already running in httpd worker thread context (async_send_text),
@@ -105,7 +110,8 @@ esp_err_t SendspinServerConnection::send_text_message(const std::string &message
   // Use placement new to properly construct the struct with the callback
   new (resp_arg) AsyncRespArg();
 
-  resp_arg->context = (void *) this;
+  resp_arg->server = this->server_;
+  resp_arg->sockfd = this->sockfd_;
   auto message_allocator = RAMAllocator<uint8_t>(RAMAllocator<uint8_t>::ALLOC_INTERNAL);
   resp_arg->payload = message_allocator.allocate(message.size());
   if (resp_arg->payload == nullptr) {
@@ -207,15 +213,13 @@ void SendspinServerConnection::async_send_text(void *arg) {
   httpd_ws_frame_t ws_pkt;
   memset(&ws_pkt, 0, sizeof(httpd_ws_frame_t));
 
-  SendspinServerConnection *this_conn = (SendspinServerConnection *) resp_arg->context;
-
   ws_pkt.payload = resp_arg->payload;
   ws_pkt.len = resp_arg->len;
   ws_pkt.type = HTTPD_WS_TYPE_TEXT;
 
   bool send_success = false;
-  if (this_conn->is_connected()) {
-    esp_err_t err = httpd_ws_send_frame_async(this_conn->server_, this_conn->sockfd_, &ws_pkt);
+  if (resp_arg->sockfd >= 0) {
+    esp_err_t err = httpd_ws_send_frame_async(resp_arg->server, resp_arg->sockfd, &ws_pkt);
     send_success = (err == ESP_OK);
   }
 
