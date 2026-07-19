@@ -33,7 +33,7 @@ esp32:
         - esp_http_client
       # sram1_as_iram removed: it takes 128KB away from DRAM, which the sendspin
       # high-performance networking (64 WiFi buffers, 65KB TCP windows) needs at runtime
-      minimum_chip_revision: "3.1"  # saves ~10KB IRAM; remove if flashing boards with older chip revisions
+      # minimum_chip_revision: "3.1"  # optional: saves ~10KB IRAM, but breaks boards with chip rev < 3.1
 
 logger:
   level: warn
@@ -52,10 +52,10 @@ wifi:
 #  ssid:
 #  password:
   power_save_mode: none
-  # Full TX power (20dBm) makes these boards deafen their own receiver -> sendspin time-sync
-  # timeouts -> stutter + stream aborts. 8.5dB fixed identical symptoms for other sendspin users.
-  # If your AP is far away and RSSI drops below ~-70dBm, try 11dB or 14dB instead.
-  output_power: 8.5dB
+  # If playback stutters with "sendspin.time_burst: Time message timed out" in the logs,
+  # lower the TX power: at full power (20dBm) the board desensitizes its own receiver,
+  # breaking sendspin time-sync. 8.5dB works well close to the AP; use 11-14dB if far away.
+  # output_power: 11dB
   ap:
     ssid: "luxemusic"
     password: "12345678"
@@ -67,6 +67,15 @@ psram:
 ota:
   - platform: esphome
     id: ota_esphome
+  - platform: http_request
+    id: ota_http_request
+update:
+  - platform: http_request
+    id: update_http_request
+    name: Firmware
+    source: https://raw.githubusercontent.com/RASPIAUDIO/esphomeLuxeMusic/main/manifest_update.json
+
+http_request:
 
 captive_portal:
 
