@@ -1,0 +1,15 @@
+[project]
+name = "esphome-luxe-music"
+version = "0.1.0"
+description = "Build environment for the Raspiaudio Muse Luxe Music Assistant (Sendspin) firmware"
+requires-python = ">=3.12"
+dependencies = [
+    "esphome>=2026.7.0",
+]
+
+[tool.uv]
+# cryptography no longer publishes Intel-mac wheels; resolve only for platforms we use
+environments = [
+    "sys_platform == 'darwin' and platform_machine == 'arm64'",
+    "sys_platform == 'linux'",
+]

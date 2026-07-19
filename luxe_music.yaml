@@ -1,30 +1,39 @@
 substitutions:
-    startup_sound_file: https://github.com/RASPIAUDIO/esphomeLuxe/raw/refs/heads/main/wav/sounds_timer_finished.wav    
+    startup_sound_file: https://github.com/RASPIAUDIO/esphomeLuxe/raw/refs/heads/main/wav/sounds_timer_finished.wav
 
 esphome:
   name: muse-luxe-music
   friendly_name: Raspiaudio Luxe Music
-  min_version: 2026.1.0
+  min_version: 2026.6.0
   name_add_mac_suffix: true
-  platformio_options:
-    build_flags:
-      - -I../../../compat
   on_boot:
     priority: -100
     then:
       - script.execute: led_red
+      # playlist_delay moved from the pipeline config to a runtime action in 2026.7
+      - speaker_source.set_playlist_delay:
+          id: external_media_player
+          pipeline: announcement
+          delay: 500ms
+      - speaker_source.set_playlist_delay:
+          id: external_media_player
+          pipeline: media
+          delay: 1500ms
   project:
     name: raspiaudio.music-assistant
-    version: "2026.1.7"  
-    
+    version: "2026.7.0"
+
 esp32:
   variant: esp32
+  cpu_frequency: 240MHz
   framework:
     type: esp-idf
     advanced:
       include_builtin_idf_components:
         - esp_http_client
-      sram1_as_iram: true
+      # sram1_as_iram removed: it takes 128KB away from DRAM, which the sendspin
+      # high-performance networking (64 WiFi buffers, 65KB TCP windows) needs at runtime
+      minimum_chip_revision: "3.1"  # saves ~10KB IRAM; remove if flashing boards with older chip revisions
 
 logger:
   level: warn
@@ -40,9 +49,13 @@ api:
         }
 
 wifi:
-#  ssid: 
-#  password: 
+#  ssid:
+#  password:
   power_save_mode: none
+  # Full TX power (20dBm) makes these boards deafen their own receiver -> sendspin time-sync
+  # timeouts -> stutter + stream aborts. 8.5dB fixed identical symptoms for other sendspin users.
+  # If your AP is far away and RSSI drops below ~-70dBm, try 11dB or 14dB instead.
+  output_power: 8.5dB
   ap:
     ssid: "luxemusic"
     password: "12345678"
@@ -50,48 +63,16 @@ wifi:
 psram:
   mode: quad
   speed: 80MHz
-  
-ota:                 
+
+ota:
   - platform: esphome
     id: ota_esphome
-  - platform: http_request
-    id: ota_http_request  
-update:
-  - platform: http_request
-    id: update_http_request
-    name: Firmware
-    source: https://raw.githubusercontent.com/RASPIAUDIO/esphomeLuxeMusic/main/manifest_update.json   
 
-http_request:
-
-audio:
-  codecs:
-    flac:
-    mp3:
-    wav:
-  
 captive_portal:
 
-improv_serial: 
+improv_serial:
 
 external_components:
-  - source:
-      type: local
-      path: local_components
-    components: [sendspin]
-  - source:
-      # https://github.com/esphome/esphome/pull/12284
-      type: git
-      url: https://github.com/esphome/esphome
-      ref: fd9af678da24102f414b78ac90e66a3b7cd98460
-    components: [mdns]
-  - source:
-      # https://github.com/esphome/esphome/pull/12429
-      type: git
-      url: https://github.com/esphome/esphome
-      ref: 9055f4f868c2f889d58c576c7c5e4177477180bd
-    refresh: 0s
-    components: [file, media_source, speaker_source]
   - source: github://RASPIAUDIO/esphomeLuxe@main
     components: [es8388]
     refresh: 0s
@@ -145,24 +126,28 @@ speaker:
 
   - platform: resampler
     id: announcement_resampling_input
-    output_speaker: announcement_mixer_input    
+    output_speaker: announcement_mixer_input
     sample_rate: 48000
     buffer_duration: 250ms
 
 sendspin:
   id: sendspin_hub
   task_stack_in_psram: true
-  kalman_process_error: 0.01
+
+audio_file:
+  - id: ready_sound
+    file: ${startup_sound_file}
 
 media_source:
   - platform: sendspin
     id: sendspin_source
-    buffer_size: 2000000
-  - platform: file
+    buffer_size: 1000000
+    sample_rate: 48000
+    # classic ESP32: keep the decoder's stack and working buffers in fast internal RAM;
+    # PSRAM here is on the slow SPI bus and starves the FLAC decoder
+    decode_memory: internal
+  - platform: audio_file
     id: file_source
-    files:
-      - id: ready_sound
-        file: ${startup_sound_file}
 
 media_player:
   - platform: sendspin
@@ -170,26 +155,25 @@ media_player:
   - platform: speaker_source
     name: none
     id: external_media_player
-    announcement_speaker: announcement_resampling_input
-    media_speaker: media_resampling_input
 
     announcement_pipeline:
+      speaker: announcement_resampling_input
+      sources:
+        - file_source
       format: FLAC
       num_channels: 1
       sample_rate: 48000
-      playlist_delay: 500ms
     media_pipeline:
+      speaker: media_resampling_input
+      sources:
+        - sendspin_source
       format: FLAC
-      num_channels: 2      
+      num_channels: 2
       sample_rate: 48000
-      playlist_delay: 1500ms
 
     volume_increment: 0.05
     volume_min: 0.05
     volume_max: 0.95
-    sources:
-      - sendspin_source
-      - file_source
     on_state:
       then:
         - lambda: |-
@@ -220,7 +204,7 @@ script:
           if ( (id(external_media_player).state != media_player::MediaPlayerState::MEDIA_PLAYER_STATE_ANNOUNCING ) || priority) {
             id(external_media_player)
               ->make_call()
-              .set_media_url("file://" + sound_file)
+              .set_media_url("audio-file://" + sound_file)
               .set_announcement(true)
               .perform();
           }
@@ -323,14 +307,32 @@ light:
           min_brightness: 50%
           max_brightness: 100%
 
+# Quiet heap watchdog: only logs when memory is actually tight. Healthy playback runs
+# ~168KB free / 90KB largest block; sustained readings below these thresholds mean the
+# network stack is about to starve (the cause of the 2026-07 stutter-then-stop bug).
+# Slow-loop issues self-report via ESPHome's built-in "took a long time" warnings.
+interval:
+  - interval: 15s
+    then:
+      - lambda: |-
+          size_t free_internal = heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+          size_t largest = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+          if (free_internal < 60 * 1024 || largest < 24 * 1024) {
+            ESP_LOGW("heap_canary", "Internal heap low: %u B free, largest block %u B", free_internal, largest);
+          }
+
 sensor:
+ - platform: wifi_signal
+   name: WiFi Signal
+   update_interval: 30s
+   entity_category: diagnostic
  - platform: adc
    pin: GPIO33
    name: Battery
    icon: "mdi:battery-outline"
    update_interval: 15s
    accuracy_decimals: 3
-   attenuation: 11db
+   attenuation: 12db
    raw: true
    filters:
     - multiply: 0.00173913 # 2300 -> 4, for attenuation 11db, based on Olivier's code
