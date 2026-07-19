@@ -8,3 +8,7 @@
 /.venv/
 __pycache__/
 *.pyc
+
+# Local secrets
+musicassistant_api.key
+*.key

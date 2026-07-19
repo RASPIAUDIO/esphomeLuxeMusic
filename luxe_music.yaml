@@ -116,6 +116,10 @@ speaker:
     dac_type: external
     channel: stereo
     buffer_duration: 1000ms
+    # APLL gives an accurate 48kHz I2S clock. Without it the classic ESP32's I2S rate is
+    # off by enough that sendspin's clock sync has to hard-correct (insert/drop frames)
+    # every few seconds, which is audible as periodic stutter/ticks.
+    use_apll: true
 
   - platform: mixer
     id: mixing_speaker
