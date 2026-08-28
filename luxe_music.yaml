@@ -4,24 +4,33 @@ substitutions:
 esphome:
   name: muse-luxe-music
   friendly_name: Raspiaudio Luxe Music
-  min_version: 2026.1.0
+  min_version: 2026.5.0
   name_add_mac_suffix: true
-  platformio_options:
-    build_flags:
-      - -I../../../compat
   on_boot:
     priority: -100
     then:
+      # GPIO21 commande la mise en sourdine de l'amplificateur de la Luxe.
+      - output.turn_off: dac_mute
+      # Laisse le mixer terminer une annonce avant la reprise d'un flux MA.
+      - speaker_source.set_playlist_delay:
+          id: external_media_player
+          pipeline: announcement
+          delay: 500ms
+      - speaker_source.set_playlist_delay:
+          id: external_media_player
+          pipeline: media
+          delay: 1500ms
       - script.execute: led_red
   project:
     name: raspiaudio.music-assistant
-    version: "2026.1.7"  
+    version: "2026.8.4"
     
 esp32:
   variant: esp32
   framework:
     type: esp-idf
     advanced:
+      minimum_chip_revision: "3.1"
       include_builtin_idf_components:
         - esp_http_client
       sram1_as_iram: true
@@ -30,23 +39,40 @@ logger:
   level: warn
 
 api:
+  # La lecture Sendspin doit continuer même sans client Home Assistant connecté.
+  reboot_timeout: 0s
   on_client_connected:
-    - lambda: |-
-        if (!id(boot_sound_played)) {
-          id(boot_sound_played) = true;
-          if (id(startup_sound_switch).state) {
-            id(play_sound)->execute(true, std::string("ready_sound"));
-          }
-        }
+    - if:
+        condition:
+          lambda: return !id(boot_sound_played);
+        then:
+          - lambda: id(boot_sound_played) = true;
+          # Laisse MA restaurer son groupe avant de décider si l'annonce peut jouer.
+          - delay: 5s
+          - if:
+              condition:
+                lambda: |-
+                  using media_player::MediaPlayerState;
+                  return id(startup_sound_switch).state &&
+                    id(external_media_player).state != MediaPlayerState::MEDIA_PLAYER_STATE_PLAYING &&
+                    id(external_media_player).state != MediaPlayerState::MEDIA_PLAYER_STATE_ANNOUNCING;
+              then:
+                - script.execute:
+                    id: play_sound
+                    priority: true
+                    sound_file: ready_sound
 
 wifi:
 #  ssid: 
 #  password: 
   power_save_mode: none
+#  output_power: 20dB
   ap:
     ssid: "luxemusic"
     password: "12345678"
+    
 
+    
 psram:
   mode: quad
   speed: 80MHz
@@ -63,38 +89,19 @@ update:
     source: https://raw.githubusercontent.com/RASPIAUDIO/esphomeLuxeMusic/main/manifest_update.json   
 
 http_request:
-
-audio:
-  codecs:
-    flac:
-    mp3:
-    wav:
   
 captive_portal:
 
 improv_serial: 
 
 external_components:
+  # Initialisation spécifique du codec de la museLuxe (sorties différentielles
+  # et horloge MCLK sur GPIO0). Sendspin et la chaîne audio sont désormais natifs.
   - source:
-      type: local
-      path: local_components
-    components: [sendspin]
-  - source:
-      # https://github.com/esphome/esphome/pull/12284
       type: git
-      url: https://github.com/esphome/esphome
-      ref: fd9af678da24102f414b78ac90e66a3b7cd98460
-    components: [mdns]
-  - source:
-      # https://github.com/esphome/esphome/pull/12429
-      type: git
-      url: https://github.com/esphome/esphome
-      ref: 9055f4f868c2f889d58c576c7c5e4177477180bd
-    refresh: 0s
-    components: [file, media_source, speaker_source]
-  - source: github://RASPIAUDIO/esphomeLuxe@main
+      url: https://github.com/RASPIAUDIO/esphomeLuxe
+      ref: 192372ff59b560a74aa547dc26af609918fcc9d6
     components: [es8388]
-    refresh: 0s
 
 i2c:
   sda: GPIO18
@@ -125,7 +132,8 @@ speaker:
     i2s_dout_pin: GPIO26
     dac_type: external
     channel: stereo
-    buffer_duration: 1000ms
+    sample_rate: 48000
+    buffer_duration: 300ms
 
   - platform: mixer
     id: mixing_speaker
@@ -133,63 +141,60 @@ speaker:
     num_channels: 2
     source_speakers:
       - id: announcement_mixer_input
-        buffer_duration: 250ms
       - id: media_mixer_input
-        buffer_duration: 250ms
 
   - platform: resampler
     id: media_resampling_input
     output_speaker: media_mixer_input
     sample_rate: 48000
-    buffer_duration: 250ms
 
   - platform: resampler
     id: announcement_resampling_input
     output_speaker: announcement_mixer_input    
     sample_rate: 48000
-    buffer_duration: 250ms
 
 sendspin:
   id: sendspin_hub
-  task_stack_in_psram: true
-  kalman_process_error: 0.01
+
+audio_file:
+  - id: ready_sound
+    file: ${startup_sound_file}
 
 media_source:
   - platform: sendspin
     id: sendspin_source
     buffer_size: 2000000
-  - platform: file
+  - platform: audio_file
     id: file_source
-    files:
-      - id: ready_sound
-        file: ${startup_sound_file}
 
 media_player:
   - platform: sendspin
     id: sendspin_media_player
+    name: museLuxe
+    volume_increment: 2%
   - platform: speaker_source
-    name: none
+    name: museLuxe Audio
     id: external_media_player
-    announcement_speaker: announcement_resampling_input
-    media_speaker: media_resampling_input
+    internal: true
 
     announcement_pipeline:
+      speaker: announcement_resampling_input
+      sources:
+        - file_source
       format: FLAC
       num_channels: 1
       sample_rate: 48000
-      playlist_delay: 500ms
     media_pipeline:
+      speaker: media_resampling_input
+      sources:
+        - sendspin_source
       format: FLAC
       num_channels: 2      
       sample_rate: 48000
-      playlist_delay: 1500ms
 
     volume_increment: 0.05
     volume_min: 0.05
     volume_max: 0.95
-    sources:
-      - sendspin_source
-      - file_source
     on_state:
       then:
         - lambda: |-
@@ -220,7 +225,7 @@ script:
           if ( (id(external_media_player).state != media_player::MediaPlayerState::MEDIA_PLAYER_STATE_ANNOUNCING ) || priority) {
             id(external_media_player)
               ->make_call()
-              .set_media_url("file://" + sound_file)
+              .set_media_url("audio-file://" + sound_file)
               .set_announcement(true)
               .perform();
           }
@@ -284,7 +289,7 @@ binary_sensor:
     name: Volume Up
     on_click:
       - media_player.volume_up:
-          id: external_media_player
+          id: sendspin_media_player
 
   - platform: gpio
     pin:
@@ -296,7 +301,7 @@ binary_sensor:
     name: Volume Down
     on_click:
       - media_player.volume_down:
-          id: external_media_player
+          id: sendspin_media_player
 
 light:
   - platform: esp32_rmt_led_strip
@@ -330,7 +335,7 @@ sensor:
    icon: "mdi:battery-outline"
    update_interval: 15s
    accuracy_decimals: 3
-   attenuation: 11db
+   attenuation: 12db
    raw: true
    filters:
     - multiply: 0.00173913 # 2300 -> 4, for attenuation 11db, based on Olivier's code
@@ -338,3 +343,6 @@ sensor:
         alpha: 0.2
         send_every: 2
     - delta: 0.002
+ - platform: wifi_signal
+   name: "Signal WiFi museLuxe"
+   update_interval: 10s    
