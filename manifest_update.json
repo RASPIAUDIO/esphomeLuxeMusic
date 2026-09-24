@@ -1,11 +1,11 @@
 {
   "name": "raspiaudio.luxe-music-assistant",
-  "version": "2026.8.4",
+  "version": "2026.9.3",
   "builds": [
     {
       "chipFamily": "ESP32",
       "ota": {
-         "md5": "ae18a4c0eba497f0594880a795a30c67",  
+         "md5": "eb9b5fad9aba8b3fbd21bf225da0ca20",
          "path": "https://raw.githubusercontent.com/RASPIAUDIO/esphomeLuxeMusic/main/update_firmware.bin",
          "offset": 0,
          "summary": "Latest firmware"
